@@ -135,6 +135,9 @@ const SunsetPredictor = () => {
     const [errorMsg, setErrorMsg] = useState('');
     const [appGradient, setAppGradient] = useState('default');
     const [closestSpots, setClosestSpots] = useState([]);
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
 
     const resultsRef = useRef(null);
     const spotsSectionRef = useRef(null);
@@ -182,6 +185,36 @@ const SunsetPredictor = () => {
         const endTime = forecast.date.toISOString().replace(/-|:|\.\d+/g, '');
         const calUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('🌅 צילום שקיעה - Golden Hour')}&dates=${startTime}/${endTime}&details=${encodeURIComponent('ציון שקיעה צפוי: ' + forecast.eval.score + '% - ' + forecast.eval.desc)}`;
         window.open(calUrl, '_blank');
+    };
+
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (cityInput.trim().length > 1) {
+                setIsFetchingSuggestions(true);
+                try {
+                    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityInput)}&count=5&language=he`);
+                    const data = await res.json();
+                    setSuggestions(data.results || []);
+                    setShowSuggestions(true);
+                } catch (err) {
+                    console.error('Error fetching suggestions', err);
+                } finally {
+                    setIsFetchingSuggestions(false);
+                }
+            } else {
+                setSuggestions([]);
+                setShowSuggestions(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [cityInput]);
+
+    const handleSuggestionClick = (suggestion) => {
+        setCityInput(suggestion.name);
+        setShowSuggestions(false);
+        setLocationName(`תחזית עבור ${suggestion.name}${suggestion.country ? ', ' + suggestion.country : ''}`);
+        fetchSunsetForecast(suggestion.latitude, suggestion.longitude);
     };
 
     useEffect(() => {
@@ -532,7 +565,7 @@ const SunsetPredictor = () => {
 
             <div className="sunset-container">
                 <header>
-                    <h1>תחזית שקיעות V3</h1>
+                    <h1>תחזית שקיעות</h1>
                     <p className="subtitle">האלגוריתם החדש והמדויק לשקיעות נדירות באמת</p>
                 </header>
 
@@ -545,7 +578,20 @@ const SunsetPredictor = () => {
                             value={cityInput}
                             onChange={(e) => setCityInput(e.target.value)}
                             onKeyPress={handleKeyPress}
+                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                            onFocus={() => cityInput.trim().length > 1 && setShowSuggestions(true)}
                         />
+                        {showSuggestions && suggestions.length > 0 && (
+                            <ul className="suggestions-dropdown">
+                                {suggestions.map((s, idx) => (
+                                    <li key={idx} onClick={() => handleSuggestionClick(s)}>
+                                        <MapPin size={16} />
+                                        <span className="suggestion-name">{s.name}</span>
+                                        <span className="suggestion-admin">{s.admin1 || s.country}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                         <button className="search-btn" onClick={handleSearch} title="חפש">
                             חיפוש
                         </button>
