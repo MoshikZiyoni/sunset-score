@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SunCalc from 'suncalc';
 import Tilt from 'react-parallax-tilt';
-import { Compass, CloudRain, Sunrise, Info, MapPin, Search, CalendarPlus, Share2, ChevronDown, ChevronUp, Wind, Map, Navigation, Sun } from 'lucide-react';
+import { Compass, Sunrise, Info, MapPin, Search, CalendarPlus, Share2, ChevronDown, ChevronUp, Wind, Map, Navigation, Sun } from 'lucide-react';
 import './SunsetPredictor.css';
 
 // --- Recommended Spots DB (Israel) ---
