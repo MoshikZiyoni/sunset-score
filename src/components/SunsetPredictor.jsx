@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SunCalc from 'suncalc';
 import Tilt from 'react-parallax-tilt';
-import { Compass, Sunrise, Info, MapPin, Search, CalendarPlus, Share2, ChevronDown, ChevronUp, Wind, Map, Navigation, Sun } from 'lucide-react';
+import { Compass, Sunset, Info, MapPin, Search, CalendarPlus, Share2, ChevronDown, ChevronUp, Wind, Map, Navigation, Sun } from 'lucide-react';
 import './SunsetPredictor.css';
 
-// --- Recommended Spots DB (Israel) ---
+// --- Recommended Spots DB (Israel Fallback) ---
 const sunsetSpots = [
     { name: 'חוף הצוק (תל אביב)', desc: 'חוף פתוח לחלוטין למערב עם בריזת ים צלולה', type: 'beach', lat: 32.1388, lon: 34.7937 },
     { name: 'טיילת ארמון הנציב (ירושלים)', desc: 'תצפית פנורמית מרהיבה על כל העיר העתיקה', type: 'viewpoint', lat: 31.7533, lon: 35.2396 },
@@ -143,8 +143,9 @@ const SunsetPredictor = () => {
     const spotsSectionRef = useRef(null);
 
     const scrollToSpots = () => {
-        if (spotsSectionRef.current) {
-            spotsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const spotsEl = document.querySelector('.spots-section');
+        if (spotsEl) {
+            spotsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     };
 
@@ -279,6 +280,107 @@ const SunsetPredictor = () => {
         });
     };
 
+    const getFallbackSpots = (latitude, longitude) => {
+        const spotsWithDist = sunsetSpots.map(s => ({
+            ...s,
+            distance: getDistanceFromLatLonInKm(latitude, longitude, s.lat, s.lon)
+        }));
+        // Limit fallback spots to 25km radius so we don't return spots from across the country
+        const closeSpots = spotsWithDist.filter(s => s.distance <= 25);
+        closeSpots.sort((a, b) => a.distance - b.distance);
+        return closeSpots.slice(0, 6);
+    };
+
+    const fetchDynamicSpots = async (lat, lon) => {
+        try {
+            // Find viewpoints and beaches within ~12km, with a 5 second timeout
+            const radius = 12000;
+            const query = `
+                [out:json][timeout:5];
+                (
+                  node["tourism"="viewpoint"](around:${radius},${lat},${lon});
+                  way["tourism"="viewpoint"](around:${radius},${lat},${lon});
+                  node["natural"="beach"](around:${radius},${lat},${lon});
+                  way["natural"="beach"](around:${radius},${lat},${lon});
+                  node["leisure"="park"](around:${radius},${lat},${lon});
+                  way["leisure"="park"](around:${radius},${lat},${lon});
+                  node["natural"="peak"](around:${radius},${lat},${lon});
+                  node["historic"="ruins"](around:${radius},${lat},${lon});
+                  way["historic"="ruins"](around:${radius},${lat},${lon});
+                  node["leisure"="nature_reserve"](around:${radius},${lat},${lon});
+                  way["leisure"="nature_reserve"](around:${radius},${lat},${lon});
+                  node["amenity"="bench"](around:${radius},${lat},${lon});
+                );
+                out center 50;
+            `;
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+            const response = await fetch('https://overpass-api.de/api/interpreter', {
+                method: 'POST',
+                body: query,
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            if (!response.ok) throw new Error(`Overpass API failed: ${response.status}`);
+
+            const data = await response.json();
+
+            if (!data || !data.elements || data.elements.length === 0) {
+                setClosestSpots(getFallbackSpots(lat, lon));
+                return;
+            }
+
+            let spots = data.elements.map(el => {
+                const elementLat = el.lat || el.center.lat;
+                const elementLon = el.lon || el.center.lon;
+
+                let name = '';
+                if (el.tags) {
+                    name = el.tags['name:he'] || el.tags.name || '';
+                }
+
+                let typeText = 'נקודת נוף / תצפית';
+                if (el.tags) {
+                    if (el.tags.natural === 'beach') typeText = 'חוף ים';
+                    else if (el.tags.leisure === 'park') typeText = 'פארק / גן ציבורי';
+                    else if (el.tags.natural === 'peak') typeText = 'פסגה / אזור גבוה';
+                    else if (el.tags.historic === 'ruins') typeText = 'עתיקות / חורבה';
+                    else if (el.tags.leisure === 'nature_reserve') typeText = 'שמורת טבע';
+                    else if (el.tags.amenity === 'bench') typeText = 'ספסל ציבורי';
+                }
+
+                if (!name) name = typeText;
+
+                return {
+                    name: name,
+                    desc: `${typeText} פוטנציאלי באזור שלך`,
+                    lat: elementLat,
+                    lon: elementLon,
+                    distance: getDistanceFromLatLonInKm(lat, lon, elementLat, elementLon)
+                };
+            });
+
+            const namedSpots = spots.filter(s => s.name !== 'נקודת נוף / תצפית' && s.name !== 'פארק / גן ציבורי' && s.name !== 'ספסל ציבורי' && s.name !== 'חוף ים');
+            if (namedSpots.length >= 2) {
+                spots = namedSpots;
+            }
+
+            spots = spots.filter((spot, index, self) =>
+                index === self.findIndex((t) => (t.name === spot.name))
+            );
+
+            spots.sort((a, b) => a.distance - b.distance);
+            setClosestSpots(spots.slice(0, 6));
+
+        } catch (error) {
+            console.error("Error fetching dynamic spots, using fallback:", error);
+            setClosestSpots(getFallbackSpots(lat, lon));
+        }
+    };
+
     const fetchSunsetForecast = async (lat, lon) => {
         try {
             // Fetch Weather API
@@ -362,13 +464,8 @@ const SunsetPredictor = () => {
             });
         }
 
-        // --- Calculate Closest Spots ---
-        const spotsWithDist = sunsetSpots.map(s => ({
-            ...s,
-            distance: getDistanceFromLatLonInKm(lat, lon, s.lat, s.lon)
-        }));
-        spotsWithDist.sort((a, b) => a.distance - b.distance);
-        setClosestSpots(spotsWithDist.slice(0, 6)); // Show top 6 closest spots
+        // Fetch dynamic spots based on coordinates
+        fetchDynamicSpots(lat, lon);
 
         setForecasts(newForecasts);
         setIsLoading(false);
@@ -457,10 +554,16 @@ const SunsetPredictor = () => {
                                 </div>
 
                                 <div className="card-time-wrap">
-                                    <div className="sun-icon-container">
-                                        <Sunrise size={45} className="sun-icon animate-pulse-slow" strokeWidth={1.5} />
+                                    <div className="sun-time-block">
+                                        <div className="sun-icon-container">
+                                            <Sunset size={45} className="sun-icon animate-pulse-slow" strokeWidth={1.5} />
+                                        </div>
+                                        <div className="card-time">{timeStr}</div>
                                     </div>
-                                    <div className="card-time">{timeStr}</div>
+                                    <div className="card-golden-hour">
+                                        <Sunset size={14} className="sun-icon inline" style={{ display: 'inline', verticalAlign: 'middle', marginLeft: '0.4rem' }} />
+                                        <span className="gh-label">שעת זהב:</span> <span className="gh-val">{goldenHourStr}</span>
+                                    </div>
                                 </div>
 
                                 <div className="card-extra-grid">
@@ -476,11 +579,6 @@ const SunsetPredictor = () => {
                                         <span className="extra-label">אור אחרון</span>
                                         <span className="extra-val">{duskStr}</span>
                                     </div>
-                                </div>
-
-                                <div className="card-golden-hour">
-                                    <Sunrise size={14} className="sun-icon inline" style={{ display: 'inline', verticalAlign: 'middle', marginLeft: '0.4rem' }} />
-                                    <span className="gh-label">שעת זהב:</span> <span className="gh-val">{goldenHourStr}</span>
                                 </div>
 
                                 <div className="card-desc">
@@ -628,36 +726,32 @@ const SunsetPredictor = () => {
                                 <div className="spots-header">
                                     <Map size={24} className="spots-icon" />
                                     <h3>מקומות טובים לראות שקיעה</h3>
-                                    <p className="spots-subtitle">(מבוסס על המיקום שלך)</p>
+                                    <p className="spots-subtitle">(מקומות מומלצים באזורך)</p>
                                 </div>
                                 <div className="spots-grid">
-                                    {closestSpots.map((spot, idx) => {
-                                        let SpotIcon = MapPin;
-                                        if (spot.type === 'beach') SpotIcon = Wind;
-                                        if (spot.type === 'mountain') SpotIcon = Navigation;
-                                        if (spot.type === 'hill') SpotIcon = Sun;
-                                        if (spot.type === 'viewpoint') SpotIcon = Map;
-                                        if (spot.type === 'cliff') SpotIcon = Sunrise;
-
-                                        return (
-                                            <div key={idx} className="spot-card glow-hover">
-                                                <div className="spot-type-badge">
-                                                    {spot.type === 'beach' && 'חוף'}
-                                                    {spot.type === 'mountain' && 'הר'}
-                                                    {spot.type === 'hill' && 'גבעה'}
-                                                    {spot.type === 'viewpoint' && 'תצפית'}
-                                                    {spot.type === 'cliff' && 'מצוק'}
-                                                </div>
-                                                <div className="spot-name">
-                                                    <SpotIcon size={18} /> {spot.name}
-                                                </div>
-                                                <p className="spot-desc">{spot.desc}</p>
-                                                <div className="spot-dist">
-                                                    <Navigation size={14} /> במרחק {spot.distance.toFixed(1)} ק"מ
-                                                </div>
+                                    {closestSpots.map((spot, idx) => (
+                                        <div key={idx} className="spot-card glow-hover">
+                                            <div className="spot-name">
+                                                <MapPin size={18} /> {spot.name}
                                             </div>
-                                        );
-                                    })}
+                                            <p className="spot-desc">{spot.desc}</p>
+                                            <div className="spot-dist">
+                                                <Navigation size={14} /> במרחק {spot.distance.toFixed(1)} ק"מ
+                                            </div>
+                                            <div className="spot-nav-links" style={{ display: 'flex', gap: '0.8rem', marginTop: '1rem', justifyContent: 'center' }}>
+                                                <a href={`https://waze.com/ul?ll=${spot.lat},${spot.lon}&navigate=yes`}
+                                                    target="_blank" rel="noopener noreferrer"
+                                                    style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '0.5rem 1rem', borderRadius: '12px', color: '#60a5fa', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem' }}>
+                                                    <Compass size={16} /> Waze
+                                                </a>
+                                                <a href={`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}`}
+                                                    target="_blank" rel="noopener noreferrer"
+                                                    style={{ background: 'rgba(16, 185, 129, 0.2)', padding: '0.5rem 1rem', borderRadius: '12px', color: '#34d399', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem' }}>
+                                                    <Map size={16} /> Maps
+                                                </a>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}

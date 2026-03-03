@@ -1273,173 +1273,230 @@ h1 {
 /* Responsive */
 @media (max-width: 768px) {
     h1 {
-        font-size: 2rem;
+        font-size: 1.6rem;
+        margin-bottom: 0.1rem;
     }
 
     .subtitle {
-        font-size: 1rem;
+        font-size: 0.85rem;
+        margin-bottom: 0.8rem;
     }
 
     .sunset-container {
-        padding: 1rem 0.5rem;
+        padding: 0.4rem;
+    }
+
+    .location-name {
+        font-size: 1.4rem;
+        margin-bottom: 1rem;
+    }
+
+    .search-section {
+        margin-bottom: 1.5rem;
     }
 
     .search-box {
-        flex-direction: column;
+        flex-direction: row;
         border-radius: 16px;
-        padding: 0.8rem;
-        gap: 0.8rem;
+        padding: 0.3rem;
+        gap: 0.3rem;
     }
 
     .search-box input {
-        width: 100%;
-        text-align: center;
-        font-size: 1rem;
+        font-size: 0.95rem;
+        padding: 0.4rem;
     }
 
     .search-btn {
-        width: 100%;
+        padding: 0.4rem 0.8rem;
         border-radius: 12px;
-        padding: 0.8rem;
+        font-size: 0.85rem;
     }
 
-    .search-icon-left {
-        display: none;
+    .glass-btn {
+        padding: 0.5rem 0.8rem;
+        font-size: 0.85rem;
+        border-radius: 16px;
+        margin-bottom: 0.5rem;
     }
 
     .tilt-wrapper-outer,
     .tilt-wrapper {
         transform: none !important;
-        /* Disable massive scaling on mobile to stop overflow */
         width: 100% !important;
         max-width: 100% !important;
         height: auto !important;
     }
 
-    .day-card {
-        border-radius: 20px;
-    }
-
     .card-content {
-        padding: 1.5rem 1rem;
+        padding: 0.8rem 0.6rem;
     }
 
     .card-score-text {
-        font-size: 2rem;
+        font-size: 1.8rem;
+        margin-bottom: 0.1rem;
     }
 
     .score-label {
-        font-size: 0.8rem;
+        font-size: 0.75rem;
     }
 
     .score-container {
-        margin-bottom: 1.5rem;
+        margin-bottom: 0.5rem;
+        padding: 0.8rem;
+        border-radius: 16px;
+    }
+
+    .card-header {
+        margin-bottom: 0.2rem;
+    }
+
+    .card-azimuth {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.4rem;
+    }
+
+    .card-date {
+        font-size: 0.9rem;
+    }
+
+    /* New Compact Time Block for Mobile */
+    .card-time-wrap {
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        gap: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .sun-time-block {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
     }
 
     .card-time {
         font-size: 2.2rem;
     }
 
-    .sun-icon-container .sun-icon {
-        width: 35px;
-        height: 35px;
+    .sun-icon-container {
+        padding: 0.3rem;
     }
 
-    .card-date {
-        font-size: 1.1rem;
+    .sun-icon-container .sun-icon {
+        width: 30px;
+        height: 30px;
+    }
+
+    .card-golden-hour {
+        margin: 0;
+        padding: 0.3rem 0.6rem;
+        font-size: 0.85rem;
+    }
+
+    .card-desc {
+        margin-bottom: 0.5rem;
+        padding: 0.6rem;
+        border-radius: 12px;
     }
 
     .card-desc .desc-title {
-        font-size: 1.2rem;
+        font-size: 1rem;
+        margin-bottom: 0.2rem;
     }
 
     .card-desc .desc-detail {
-        font-size: 0.95rem;
+        font-size: 0.8rem;
+        line-height: 1.3;
     }
 
     .hero-forecast-section {
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
     }
 
     .hero-card {
         border-radius: 20px !important;
-        min-height: auto !important;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
     }
 
     .hero-badge {
-        font-size: 0.9rem;
-        padding: 0.4rem 1rem;
-        top: -6px;
-        /* Moved down to prevent clipping at top of device */
-        right: 50%;
-        transform: translateX(50%);
+        font-size: 0.75rem;
+        padding: 0.2rem 0.6rem;
+        top: -8px;
     }
 
     .card-extra-grid {
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        padding: 0.8rem;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.3rem;
+        padding: 0.4rem;
+        margin-bottom: 0.5rem;
     }
 
     .extra-item {
-        flex: 1 1 45%;
-        /* Switched from 100% to 45% to create a wrapped grid */
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        padding-bottom: 0.6rem;
-        font-size: 0.9rem;
-    }
-
-    .extra-item:last-child {
-        border-bottom: none;
-        padding-bottom: 0;
-    }
-
-    .spots-section {
-        padding: 1.2rem;
-        border-radius: 20px;
-        text-align: right;
-    }
-
-    .spots-header h3 {
-        font-size: 1.4rem;
-    }
-
-    .spot-name {
-        font-size: 1.1rem;
-    }
-
-    .spot-desc {
-        font-size: 0.9rem;
+        flex-direction: row;
+        gap: 0.3rem;
+        padding: 0.3rem;
+        font-size: 0.8rem;
+        border-radius: 8px;
     }
 
     .card-actions {
         flex-direction: row;
         flex-wrap: wrap;
-        gap: 0.5rem;
+        gap: 0.3rem;
+        padding-top: 0.4rem;
     }
 
     .action-btn {
-        padding: 0.6rem 0.4rem;
-        font-size: 0.82rem;
-        flex: 1 1 calc(50% - 0.5rem);
+        padding: 0.5rem 0.2rem;
+        font-size: 0.75rem;
+        flex: 1 1 calc(33.333% - 0.3rem);
+        border-radius: 10px;
+    }
+
+    .spots-section {
+        padding: 0.8rem;
+        border-radius: 16px;
+        margin-top: 1rem;
+    }
+
+    .spots-header h3 {
+        font-size: 1.1rem;
+    }
+
+    .spots-subtitle {
+        font-size: 0.8rem;
     }
 
     .spots-grid {
         grid-template-columns: 1fr;
+        gap: 0.6rem;
     }
 
-    .spots-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
+    .spot-card {
+        padding: 0.8rem;
+        border-radius: 12px;
     }
 
-    .spots-subtitle {
-        font-size: 0.9rem;
+    .spot-name {
+        font-size: 1rem;
+    }
+
+    .spot-desc {
+        font-size: 0.8rem;
+        margin-bottom: 0.4rem;
+    }
+
+    .spot-nav-links {
+        flex-direction: row;
+        justify-content: center;
+        gap: 0.3rem !important;
+        margin-top: 0.4rem;
+    }
+
+    .nav-link {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.8rem;
     }
 }
