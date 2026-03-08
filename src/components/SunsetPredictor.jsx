@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SunCalc from 'suncalc';
 import Tilt from 'react-parallax-tilt';
-import { Compass, Sunset, Info, MapPin, Search, CalendarPlus, Share2, ChevronDown, ChevronUp, Wind, Map, Navigation, Sun } from 'lucide-react';
+import { Compass, Sunset, Info, MapPin, Search, CalendarPlus, Share2, ChevronDown, ChevronUp, Wind, Map, Navigation, Sun, Thermometer } from 'lucide-react';
 import './SunsetPredictor.css';
 
 // --- Recommended Spots DB (Israel Fallback) ---
@@ -41,71 +41,198 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
 // --- Scoring and Text Generation ---
 
 function evaluateSunset(conditions) {
-    const { highClouds, midClouds, lowClouds, visibility, humidity, aerosol } = conditions;
+    const { highClouds, midClouds, lowClouds, visibility, humidity, aerosol, temperature } = conditions;
+
     let score = 0;
+    let bonuses = [];
 
-    // V4 Severe Penalty: Low clouds block everything
-    if (lowClouds > 10) {
-        let penaltyScore = 40 - (lowClouds * 0.5);
-        score = Math.max(0, penaltyScore);
+    // ============================================================
+    // 1. חלון האופק (0-30 נקודות)
+    //    האם יש "חלון" שדרכו השמש יכולה לזרוח ממש לפני השקיעה?
+    //    עננים נמוכים הם הבעיה הכי גדולה כי הם ממש בגובה קו האופק.
+    // ============================================================
+    let horizonScore = 0;
+
+    if (lowClouds <= 5) {
+        horizonScore = 30; // אופק קריסטל - שקיעה גלויה לחלוטין
+    } else if (lowClouds <= 15) {
+        horizonScore = 26; // בעיקר פתוח, פתיתי עננים מוסיפים דרמה
+    } else if (lowClouds <= 30) {
+        horizonScore = 20; // עדיין סיכוי טוב לראות את השמש בשקיעה עצמה
+    } else if (lowClouds <= 45) {
+        horizonScore = 13; // פחות מ50/50 - לפעמים השמש פורצת, לפעמים לא
+    } else if (lowClouds <= 60) {
+        horizonScore = 6;  // סיכוי נמוך לראות כדור השמש עצמו
+    } else if (lowClouds <= 80) {
+        horizonScore = 2;  // כמעט בטוח מוסתר, אבל פסים של אור אפשריים
     } else {
-        // Safe to score based on canvas
-        let perfectHighClouds = false;
-
-        if (highClouds >= 40 && highClouds <= 60) {
-            score += 40;
-            perfectHighClouds = true;
-        } else if (highClouds > 10 && highClouds < 80) {
-            score += 20;
-        } else {
-            score = Math.max(0, 30 - (lowClouds * 0.5));
-        }
-
-        if (midClouds >= 10 && midClouds <= 30) {
-            score += 15;
-        }
-
-        if (aerosol > 0.15) {
-            score += perfectHighClouds ? 25 : 15;
-        } else if (aerosol > 0.08) {
-            score += 10;
-        }
-
-        if (visibility > 20000) score += 10;
-        if (humidity < 60) score += 10;
+        horizonScore = 0;  // מוסתר לחלוטין
     }
 
+    score += horizonScore;
+
+    // ============================================================
+    // 2. קנבס הצבע בשמיים (0-28 נקודות)
+    //    עננים גבוהים ובינוניים הם "לוח הציור" של השקיעה.
+    //    הם נצבעים בכתום/ורוד/אדום כשהשמש פוגעת בהם מלמטה.
+    //    הכי טוב: 30-65% עננות גבוהה + מעט בינונית.
+    // ============================================================
+    let canvasScore = 0;
+    // עננות גבוהה ובינונית - Weighted Combo
+    const canvasCover = (highClouds * 0.65) + (midClouds * 0.35);
+
+    if (canvasCover >= 30 && canvasCover <= 60) {
+        canvasScore = 28; // מושלם - המון קנבס אבל לא סגור לחלוטין
+    } else if (canvasCover > 60 && canvasCover <= 80) {
+        canvasScore = 20; // הרבה עננות - צבעונית אבל קצת כבדה
+    } else if (canvasCover >= 15 && canvasCover < 30) {
+        canvasScore = 18; // קצת קנבס - צבעים ממוקדים ליפים
+    } else if (canvasCover > 80) {
+        canvasScore = 8;  // שמיים אפורים-כבדים, אבל שכבה עליונה יכולה להאיר
+    } else {
+        canvasScore = 5;  // שמיים נקיים לחלוטין - שקיעה נקייה אבל פחות דרמה
+    }
+
+    // אם האופק סגור ברובו, הקנבס שם פחות
+    if (horizonScore <= 6) canvasScore = Math.round(canvasScore * 0.4);
+
+    score += canvasScore;
+
+    // ============================================================
+    // 3. אאוסולים — חלקיקי אוויר (0-27 נקודות)
+    //    זה הגורם הכי לא מוכר ושהכי חשוב לצבעים!
+    //    אבק סהרה, עשן, מלח ים = פיזור אור לאדום/כתום/ורוד.
+    //    גם עם 30% עננות נמוכה, אאוסול גבוה = שקיעה מדהימה על האופק
+    // ============================================================
+    let aerosolScore = 0;
+
+    if (aerosol >= 0.30) {
+        aerosolScore = 27; // סופת חול / אבק עצום — שמיים בוערים
+        bonuses.push('🏜️ אבק סהרה');
+    } else if (aerosol >= 0.20) {
+        aerosolScore = 22; // אבק גבוה — כתום-אדום עז
+        bonuses.push('🌫️ חלקיקי אבק גבוהים');
+    } else if (aerosol >= 0.12) {
+        aerosolScore = 16; // מודרטי — גוון זהוב-כתום חזק
+    } else if (aerosol >= 0.07) {
+        aerosolScore = 10; // קצת — שעה מוזהבת נחמדה
+    } else if (aerosol >= 0.04) {
+        aerosolScore = 5;  // מינימלי — אוויר צלול, צבעים עדינים
+    } else {
+        aerosolScore = 0;  // אוויר נקי מאוד — שקיעה ורודה עדינה
+    }
+
+    score += aerosolScore;
+
+    // ============================================================
+    // 4. ראות (0-10 נקודות)
+    //    ראות גבוהה + אאוסול = הצירוף הכי טוב לצבעי שקיעה
+    // ============================================================
+    let visScore = 0;
+    if (visibility > 50000) visScore = 10;
+    else if (visibility > 30000) visScore = 8;
+    else if (visibility > 15000) visScore = 5;
+    else if (visibility > 5000) visScore = 2;
+    else visScore = 0; // ערפל כבד — מוסתר
+
+    score += visScore;
+
+    // ============================================================
+    // 5. לחות (בונוס/קנס קטן)
+    //    לחות גבוהה יוצרת ערפיח שמעמעם את הצבעים.
+    //    לחות נמוכה = צבעים חדים וחיים.
+    // ============================================================
+    if (humidity < 45) {
+        score += 5; // אוויר יבש = צבעים חדים
+    } else if (humidity >= 45 && humidity <= 65) {
+        score += 0; // נייטרל
+    } else if (humidity > 65 && humidity <= 80) {
+        score -= 3; // לחות גבוהה = ערפיח קל
+    } else {
+        score -= 7; // לחות כבדה = שקיעה מטושטשת
+    }
+
+    // ============================================================
+    // 6. בונוס שילוב: "עננות נמוכה + אאוסול" = שקיעה דרמטית!
+    //    זה מה שכנראה קרה אצלך! 
+    //    עננות נמוכה בינונית + אאוסול = כתום/אדום עז על האופק.
+    //    האלגוריתם הישן עניש את זה. החדש נותן בונוס.
+    // ============================================================
+    if (lowClouds >= 20 && lowClouds <= 50 && aerosol >= 0.10) {
+        const dramaBonus = Math.round(aerosol * 30); // עד +9 נקודות
+        score += dramaBonus;
+        bonuses.push(`🌋 שקיעה דרמטית (עננות+אאוסול)`);
+    }
+
+    // ============================================================
+    // 7. בונוס שקיעה "נקייה-פסטל" — שמיים ללא עננים + נקיים
+    //    שקיעה פשוטה אבל יפה בורדו-ורוד-כחול לאחר השקיעה
+    // ============================================================
+    if (lowClouds < 5 && highClouds < 10 && midClouds < 10) {
+        score += 5;
+        bonuses.push('🌸 שקיעה פסטל נקייה');
+    }
+
+    // Final clamp
     score = Math.max(0, Math.min(100, Math.round(score)));
 
+    // ============================================================
+    // תיאורים — מדורג ומשוכלל
+    // ============================================================
     let desc, detailText, colorClass, gradientClass, img;
 
     if (score >= 85) {
-        desc = 'נדיר ומטורף 🤩';
+        if (aerosol >= 0.20) {
+            desc = 'שקיעה פסיכית בוערת 🔥';
+            detailText = `שמיים בוערים צפויים! אבק גבוה (AOD: ${aerosol?.toFixed(2)}) בשילוב עם עננות אידיאלית יצרו כנראה שקיעה ברמה שרואים פעם בחודש. ${bonuses.join(' · ')}`;
+        } else {
+            desc = 'נדיר ומטורף 🤩';
+            detailText = `תנאים מושלמים! עננות נוצה גבוהה + אוויר נקי = שמיים ורוד-כתום ריסוסי מקצה לקצה. ${bonuses.join(' · ')}`;
+        }
         colorClass = 'score-amazing';
         gradientClass = 'bg-amazing';
         img = 'amazing.png';
-        detailText = 'תנאים מושלמים! אבק באוויר, טווח עננים גבוהים מדויק ואפס הסתרה נמוכה.';
-    } else if (score >= 60) {
-        desc = 'שקיעה יפהפייה 🌅';
+
+    } else if (score >= 68) {
+        if (aerosolScore >= 16) {
+            desc = 'שמיים כתומים-בוערים 🌋';
+            detailText = `חלקיקי אוויר גבוהים (AOD: ${aerosol?.toFixed(2)}) ייצרו צבעי כתום ואדום עזים על קו האופק, גם אם העננים לא יצבעו כולם. ${bonuses.join(' · ')}`;
+        } else {
+            desc = 'שקיעה מרהיבה 🌅';
+            detailText = `שקיעה יפה עם גוונים של כתום וורוד. העננות הגבוהה תצבע את השמיים לטווח ארוך אחרי שקיעת השמש. ${bonuses.join(' · ')}`;
+        }
         colorClass = 'score-good';
         gradientClass = 'bg-good';
         img = 'good.png';
-        detailText = 'שקיעה נעימה וקלאסית של השעה המוזהבת. סבירות לגווני כתום וזהב.';
-    } else if (score >= 35) {
-        desc = 'שקיעה נחמדה ⛅';
+
+    } else if (score >= 45) {
+        if (bonuses.includes('🌋 שקיעה דרמטית (עננות+אאוסול)')) {
+            desc = 'שקיעה דרמטית ומפתיעה ⚡';
+            detailText = `שילוב של עננות נמוכה ואאוסול יכול לייצר פסים דרמטיים של אדום-כתום על קו האופק, גם אם השמיים לא "נצבעו" בגדול. ${bonuses.join(' · ')}`;
+        } else {
+            desc = 'שקיעה נחמדה ⛅';
+            detailText = 'שקיעה סולידית עם קצת צבע. לא דרמטית במיוחד אבל שווה לצאת לאוויר.';
+        }
         colorClass = 'score-average';
         gradientClass = 'bg-average';
         img = 'average.png';
-        detailText = 'שמיים נקיים או ממוצעים. השמש תשקע כרגיל אבל ללא צבעים עזים במיוחד בגלל חוסר בעננות גבוהה או אבק.';
+
+    } else if (score >= 25) {
+        desc = 'שקיעה חלשה 🌥️';
+        detailText = 'כנראה לא שווה יציאה מיוחדת. צבעים עמומים, עננות מפריעה לחזות באופק.';
+        colorClass = 'score-average';
+        gradientClass = 'bg-average';
+        img = 'average.png';
+
     } else {
-        desc = 'לא משהו היום ☁️';
+        desc = 'מוסתר / שמיים אפורים ☁️';
+        detailText = 'עננות כבדה על קו האופק. השמש לא תהיה גלויה ולא יהיו צבעים משמעותיים.';
         colorClass = 'score-bad';
         gradientClass = 'bg-bad';
         img = 'bad.png';
-        detailText = 'עננים נמוכים וערפיח מסתירים את האופק. חכו ליום טוב יותר.';
     }
 
-    return { score, desc, detailText, colorClass, gradientClass, img };
+    return { score, desc, detailText, colorClass, gradientClass, img, temperature, bonuses };
 }
 
 // Convert azimuth from radians to degrees and cardinal direction
@@ -383,8 +510,8 @@ const SunsetPredictor = () => {
 
     const fetchSunsetForecast = async (lat, lon) => {
         try {
-            // Fetch Weather API
-            const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=sunset&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,relative_humidity_2m&timezone=auto`;
+            // Fetch Weather API with temperature
+            const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=sunset&hourly=temperature_2m,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility,relative_humidity_2m&timezone=auto`;
             // Fetch Air Quality API (Aerosols)
             const aqUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=aerosol_optical_depth&timezone=auto`;
 
@@ -439,6 +566,7 @@ const SunsetPredictor = () => {
                 highClouds: hourly.cloud_cover_high[hourIndex],
                 visibility: hourly.visibility[hourIndex],
                 humidity: hourly.relative_humidity_2m[hourIndex],
+                temperature: hourly.temperature_2m[hourIndex],
                 aerosol: aqHourly.aerosol_optical_depth ? aqHourly.aerosol_optical_depth[aqHourIndex] : 0
             };
 
@@ -534,7 +662,10 @@ const SunsetPredictor = () => {
                                 {/* Score Moved to Top */}
                                 <div className="score-container">
                                     <div className="score-header-top">
-                                        <div className="score-label">ציון שקיעה</div>
+                                        <div className="score-title-group">
+                                            <div className="score-label">ציון שקיעה</div>
+                                            <img src={`/${ev.img}`} alt="Sunset Preview" className="sunset-thumbnail" />
+                                        </div>
                                         <div className={`card-score-text glow-text ${isHero ? 'hero-score-text' : ''}`}>{ev.score}%</div>
                                     </div>
                                     <div className={`score-bar-bg ${isHero ? 'hero-score-bar' : ''}`}>
@@ -559,6 +690,12 @@ const SunsetPredictor = () => {
                                             <Sunset size={45} className="sun-icon animate-pulse-slow" strokeWidth={1.5} />
                                         </div>
                                         <div className="card-time">{timeStr}</div>
+                                        {ev.temperature && (
+                                            <div className="temperature-badge" title="טמפרטורה צפויה בשקיעה">
+                                                <Thermometer size={18} className="temp-icon" />
+                                                <span>{Math.round(ev.temperature)}°C</span>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="card-golden-hour">
                                         <Sunset size={14} className="sun-icon inline" style={{ display: 'inline', verticalAlign: 'middle', marginLeft: '0.4rem' }} />

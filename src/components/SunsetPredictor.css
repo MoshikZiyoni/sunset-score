@@ -617,6 +617,26 @@ h1 {
     margin-bottom: 0.8rem;
 }
 
+.score-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.sunset-thumbnail {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    object-fit: cover;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: transform 0.3s ease;
+}
+
+.day-card:hover .sunset-thumbnail {
+    transform: scale(1.1);
+}
+
 .score-label {
     font-size: 1.1rem;
     font-weight: 800;
@@ -624,6 +644,27 @@ h1 {
     text-transform: uppercase;
     color: #e2e8f0;
     letter-spacing: 1px;
+}
+
+/* Temperature Badge */
+.temperature-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 0.4rem 0.8rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-left: 1rem;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.temp-icon {
+    color: #fbbf24;
 }
 
 .score-bar-bg {
@@ -1332,6 +1373,16 @@ h1 {
         padding: 0.8rem 0.6rem;
     }
 
+    .score-title-group {
+        gap: 0.5rem;
+    }
+
+    .sunset-thumbnail {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+    }
+
     .card-score-text {
         font-size: 1.8rem;
         margin-bottom: 0.1rem;
@@ -1386,6 +1437,18 @@ h1 {
     .sun-icon-container .sun-icon {
         width: 30px;
         height: 30px;
+    }
+
+    .temperature-badge {
+        padding: 0.3rem 0.5rem;
+        font-size: 0.9rem;
+        border-radius: 8px;
+        margin-left: 0.5rem;
+    }
+
+    .temp-icon {
+        width: 14px;
+        height: 14px;
     }
 
     .card-golden-hour {
